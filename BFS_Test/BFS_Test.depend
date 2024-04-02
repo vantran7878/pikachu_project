@@ -1,0 +1,9 @@
+# depslib dependency file v1.0
+1712021496 source:d:\1_c++\1_us\programtechnique\lap\project_pikachu\bfs_test\main.cpp
+	<iostream>
+	"object.h"
+
+1711990135 d:\1_c++\1_us\programtechnique\lap\project_pikachu\bfs_test\object.h
+	<string>
+	<fstream>
+
