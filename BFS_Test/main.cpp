@@ -1,5 +1,6 @@
 #include <iostream>
 #include "object.h"
+#include <cstring>
 
 const int MAX = 100;
 const int x_rotation[4] = {-1, 0, 1, 0}; //Left, Down, Right, Top
@@ -7,13 +8,23 @@ const int y_rotation[4] = {0, 1, 0, -1};
 
 using namespace std;
 
-void readfile(string filename, int mat[][100], int &row, int &col)
+int** init2DMat(int row, int col)
+{
+    int** mat = new int* [row + 2];
+    for (int i = 0; i <= row + 1; ++i)
+    mat[i]= new int[col + 2];
+    return mat;
+}
+
+void readfile(string filename, int** &mat , int &row, int &col)
 {
     ifstream fin;
     fin.open(filename);
 
     fin >> row >> col;
     fin.ignore();
+
+    mat = init2DMat(row, col);
 
     for (int i = 1; i <= row; ++i)
     {
@@ -26,7 +37,7 @@ void readfile(string filename, int mat[][100], int &row, int &col)
 }
 
 
-void printMat(int mat[][MAX], int row, int col)
+void printMat(int** mat, int row, int col)
 {
     for (int i = 1; i <= row; i++)
     {
@@ -47,7 +58,7 @@ void printMat_Block(Block mat[][MAX], int row, int col)
     }
 }
 
-void make_free_matrix(Block free[][MAX], int mat[][MAX], int row, int col)
+void make_free_matrix(Block free[][MAX], int** mat, int row, int col)
 {
     for (int i = 0; i <= row + 1; i++)
     {
@@ -55,7 +66,7 @@ void make_free_matrix(Block free[][MAX], int mat[][MAX], int row, int col)
         {
             if (mat[i][j] == 0)
             {
-                free[i][j].X = -1;
+                free[i][j].X = -1; //if mat has value = 0, it's blank , use for special map with blank
                 free[i][j].Y = -1;
             }
             free[i][j].X = -2; //-2 is blocked
@@ -104,12 +115,36 @@ void fill_minus_one(Block free[][MAX], int row, int col)
     }
 }
 
+int trace_corner(Block free[][MAX], Block finish, Block start) //traversal back, from finish to start
+{
+    int corner = 0;
+    Block current = finish, free_current, free_prev; //current block, the free of the current block and
+    //the free of the previous block
+    free_current = free[current.Y][current.X];
+
+    if (free_current == start) return 0; //the nearby block is the start block
+    else
+    {
+        free_prev = free[free_current.Y][free_current.X];
+        while (free_prev != start)
+        {
+            if (current.X != free_prev.X && current.Y != free_prev.Y) corner++;
+            if (corner > 2) return corner;
+
+            current = free_current;
+            free_current = free_prev;
+            free_prev = free[free_prev.Y][free_prev.X];
+            //drawing in hear
+        }
+        if (current.X != free_prev.X && current.Y != free_prev.Y) corner++;
+        return corner;
+    }
+}
+
 bool BFS(int row, int col, Block b_first, Block b_second, Block free[][MAX])
 {
     queue_path trace;
     trace.enqueue(b_first);
-
-    int corner = 0;
 
     free[b_first.Y][b_first.X].X = b_first.X;
     free[b_first.Y][b_first.X].Y = b_first.Y;
@@ -117,7 +152,7 @@ bool BFS(int row, int col, Block b_first, Block b_second, Block free[][MAX])
     free[b_second.Y][b_second.X].X = -1;
     free[b_second.Y][b_second.X].Y = -1;
 
-    printMat_Block(free, row + 1, col + 1);
+    //printMat_Block(free, row + 1, col + 1);
 
     do
     {
@@ -135,20 +170,23 @@ bool BFS(int row, int col, Block b_first, Block b_second, Block free[][MAX])
                     trace.enqueue(add);
                     free[Y1][X1].X = u.X;
                     free[Y1][X1].Y = u.Y;
-                    if (free[u.Y][u.X].Y != free[Y1][X1].Y && free[u.Y][u.X].X != free[Y1][X1].X) corner++;
                     if (trace.path[trace.head] == b_second) break;
                 }
             }
         }
     }
-    while (!trace.isEmpty() && (trace.path[trace.head] != b_second) && (corner < 3));
+    while (!trace.isEmpty() && (trace.path[trace.head] != b_second));
+
+    //printMat_Block(free, row + 1, col + 1);
+
+    int corner = trace_corner(free, trace.path[trace.head], b_first);
 
     if (corner >= 3 || trace.isEmpty()) return false;
     else if (trace.path[trace.head] == b_second) return true;
 
 }
 
-bool check_finished(int mat[][MAX], int row, int col)
+bool check_finished(int** mat, int row, int col)
 {
     for (int i = 1; i <= row; ++i)
     {
@@ -158,10 +196,10 @@ bool check_finished(int mat[][MAX], int row, int col)
     return true;
 }
 
-void game_play(int mat[][MAX], int row, int col, Block b_first, Block b_second)
+void game_play(int** mat, int row, int col, Block b_first, Block b_second)
 {
-    Block free[MAX][MAX];
-
+    Block free[MAX][MAX]; //free is the matrix for checking the block in matrix is visited or not, also
+    //it could be use to store the father block which it being visited.
 
     readfile("map.txt", mat, row, col);
     printMat(mat, row, col);
@@ -175,7 +213,7 @@ void game_play(int mat[][MAX], int row, int col, Block b_first, Block b_second)
         std::cin >> b_second.Y >> b_second.X;
 
         while (!BFS(row, col, b_first, b_second, free) || !(mat[b_first.Y][b_first.X] == mat[b_second.Y][b_second.X]))
-        {
+        { //re-enter if false
             free[b_first.Y][b_first.X].X = -2;
             free[b_first.Y][b_first.X].Y = -2;
             free[b_second.Y][b_second.X].X = -2;
@@ -190,22 +228,50 @@ void game_play(int mat[][MAX], int row, int col, Block b_first, Block b_second)
         mat[b_first.Y][b_first.X] = 0;
         mat[b_second.Y][b_second.X] = 0;
 
-        fill_minus_one(free, row + 1, col + 1);
+        fill_minus_one(free, row + 1, col + 1); //because the free matrix store the father block, we need to
+        // re-value it to -1 (the blank value) to re-play the game
 
         printMat(mat, row, col);
-        printMat_Block(free, row + 1, col + 1);
+        //printMat_Block(free, row + 1, col + 1);
         // ve duong di
     }
     cout << "You won";
 }
 
+
+char* int_to_char(int num)
+{
+    char* num_char = new char[10];
+    int i = 0;
+    while (num != 0)
+    {
+        num_char[i++] = (char(num % 10) + '0');
+        num /= 10;
+    }
+    num_char[i] = '\0';
+    for (int j = 0; j < i / 2; j++)
+    {
+        char temp = num_char[j];
+        num_char[j] = num_char[i - j - 1];
+        num_char[i - j - 1] = temp;
+    }
+
+    return num_char;
+}
+
 int main()
 {
-    int mat[MAX][MAX] = {0};
+    /*int** mat = nullptr;
     int row, col;
     Block b_first, b_second;
 
     game_play(mat, row, col, b_first, b_second);
+    */
+    int num;
+    std::cin >> num;
+    //char* temp = int_to_char(num);
+    char* p_temp = int_to_char(num);
 
+    std::cout << p_temp;
     return 0;
 }
